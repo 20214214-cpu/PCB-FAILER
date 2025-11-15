@@ -14,6 +14,7 @@ import torchvision.transforms.functional as TF
 
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 import matplotlib.pyplot as plt
+from torchviz import make_dot
 
 # -------- CONFIG ----------
 DATA_DIR = "pcb-defects"   # carpeta donde descomprimiste el dataset
@@ -207,3 +208,18 @@ if os.path.exists(MY_IMAGE2):
     print(f"Prediction for {MY_IMAGE2}: {label} (probs: {probs})")
 else:
     print(f"{MY_IMAGE2} not found in working dir. Copy it or set MY_IMAGE2 variable accordingly.")
+
+# --- Generar GRAFO del modelo (torchviz) ---
+print("\nGenerating model graph with torchviz...")
+
+dummy_input = torch.randn(1, 3, 224, 224).to(DEVICE)
+
+model_graph = make_dot(
+    model(dummy_input),
+    params=dict(model.named_parameters()),
+    show_attrs=True,
+    show_saved=True
+)
+
+model_graph.render("pcb_model_graph", format="png")
+print("Saved pcb_model_graph.png")
