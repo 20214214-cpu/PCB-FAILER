@@ -20,12 +20,18 @@ from torchviz import make_dot
 DATA_DIR = "pcb-defects"
 MY_IMAGE = "image.png"
 MY_IMAGE2 = "image2.png"
-NUM_CLASSES = 7  # 6 tipos de defectos + ok
+NUM_CLASSES = 6  # 5 tipos de defectos + ok
 BATCH_SIZE = 16
-EPOCHS = 15
+EPOCHS = 50  # Entrenamiento extendido
 LR = 1e-4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 OUT_MODEL = "pcb_resnet18_multiclass.pth"
+BALANCE_OK_CLASS = True  # Si es True, replica imágenes OK 3x para balanceo
+OK_REPLICATION_FACTOR = 3  # Factor de replicación para clase OK
+
+# Early Stopping
+EARLY_STOPPING_PATIENCE = 10  # Detener si no mejora en N epochs
+MIN_DELTA = 0.001  # Mejora mínima para considerar progreso
 
 # Mapeo de clases
 CLASS_NAMES = [
@@ -34,8 +40,7 @@ CLASS_NAMES = [
     "Mouse_bite",          # 2
     "Open_circuit",        # 3
     "Short",               # 4
-    "Spur",                # 5
-    "Spurious_copper"      # 6
+    "Spur"                 # 5
 ]
 
 DEFECT_FOLDERS = {
@@ -43,16 +48,15 @@ DEFECT_FOLDERS = {
     "Mouse_bite": 2,
     "Open_circuit": 3,
     "Short": 4,
-    "Spur": 5,
-    "Spurious_copper": 6
+    "Spur": 5
 }
 # --------------------------
 
 def build_image_list(data_dir):
     """
     Construye lista de imágenes con sus etiquetas multiclase
-    - PCB_USED -> clase 0 (ok)
-    - Cada carpeta de defecto -> clase específica (1-6)
+    - PCB_USED -> clase 0 (ok) - Opcionalmente replicada según BALANCE_OK_CLASS
+    - Cada carpeta de defecto -> clase específica (1-5)
     """
     img_paths = []
     labels = []
@@ -65,6 +69,11 @@ def build_image_list(data_dir):
                 # Determinar la clase según la carpeta
                 if "PCB_USED" in root:
                     lbl = 0  # ok
+                    # Replicar imágenes OK si está activado el balanceo
+                    replication = OK_REPLICATION_FACTOR if BALANCE_OK_CLASS else 1
+                    for _ in range(replication):
+                        img_paths.append(str(p))
+                        labels.append(lbl)
                 else:
                     # Buscar en qué carpeta de defecto está
                     lbl = 0  # default ok
@@ -72,9 +81,9 @@ def build_image_list(data_dir):
                         if defect_name in root:
                             lbl = defect_label
                             break
-                
-                img_paths.append(str(p))
-                labels.append(lbl)
+                    
+                    img_paths.append(str(p))
+                    labels.append(lbl)
     
     return img_paths, labels
 
@@ -96,12 +105,14 @@ class PCBClassDataset(Dataset):
         label = self.labels[idx]
         return img, label
 
-# --- Transforms ---
+# --- Transforms - Aumentaciones específicas para PCB ---
 train_tf = transforms.Compose([
     transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.RandomHorizontalFlip(p=0.5),  # Flip horizontal
+    transforms.RandomVerticalFlip(p=0.5),     # Flip vertical
+    transforms.RandomRotation(5),              # Rotación suave ±5°
+    transforms.ColorJitter(brightness=0.15, contrast=0.15),  # Ajustes de iluminación suaves
+    transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),  # Blur suave ocasional
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -164,11 +175,14 @@ class_weights = torch.FloatTensor(class_weights).to(DEVICE)
 criterion = nn.CrossEntropyLoss(weight=class_weights)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
-# --- Training loop ---
+# --- Training loop con Early Stopping ---
 print("\n=== Entrenamiento ===")
+print(f"Early Stopping: Patience={EARLY_STOPPING_PATIENCE}, Min Delta={MIN_DELTA}")
+
 best_val = 0.0
 train_losses = []
 val_accs = []
+epochs_no_improve = 0
 
 for epoch in range(EPOCHS):
     model.train()
@@ -206,28 +220,40 @@ for epoch in range(EPOCHS):
     acc = accuracy_score(val_trues, val_preds)
     val_accs.append(acc)
     
-    print(f"Epoch {epoch+1}: train_loss={epoch_loss:.4f} val_acc={acc:.4f}")
+    print(f"Epoch {epoch+1}: train_loss={epoch_loss:.4f} val_acc={acc:.4f}", end="")
     
-    if acc > best_val:
+    # Early Stopping Logic
+    if acc > best_val + MIN_DELTA:
         best_val = acc
+        epochs_no_improve = 0
         torch.save(model.state_dict(), OUT_MODEL)
-        print("✓ Saved best model.")
+        print(" ✓ Saved best model.")
+    else:
+        epochs_no_improve += 1
+        print(f" (no improvement: {epochs_no_improve}/{EARLY_STOPPING_PATIENCE})")
+        
+        if epochs_no_improve >= EARLY_STOPPING_PATIENCE:
+            print(f"\n⚠ Early stopping triggered after {epoch+1} epochs")
+            print(f"Best validation accuracy: {best_val:.4f}")
+            break
 
 # --- Gráficas de entrenamiento ---
 plt.figure(figsize=(12, 4))
 
 plt.subplot(1, 2, 1)
-plt.plot(range(1, EPOCHS+1), train_losses, marker='o')
+plt.plot(range(1, len(train_losses)+1), train_losses, marker='o')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.title('Training Loss')
 plt.grid(True)
 
 plt.subplot(1, 2, 2)
-plt.plot(range(1, EPOCHS+1), val_accs, marker='o', color='orange')
+plt.plot(range(1, len(val_accs)+1), val_accs, marker='o', color='orange')
+plt.axhline(y=best_val, color='r', linestyle='--', label=f'Best: {best_val:.4f}')
 plt.xlabel('Epoch')
 plt.ylabel('Accuracy')
 plt.title('Validation Accuracy')
+plt.legend()
 plt.grid(True)
 
 plt.tight_layout()

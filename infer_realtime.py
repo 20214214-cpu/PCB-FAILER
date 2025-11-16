@@ -13,7 +13,7 @@ import numpy as np
 import time
 
 # Configuración
-NUM_CLASSES = 7
+NUM_CLASSES = 6
 MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,7 +24,6 @@ CLASS_NAMES = [
     "Circuito_abierto",
     "Corto_circuito",
     "Rama_cobre",
-    "Cobre_derramado"
 ]
 
 # Colores para cada clase (BGR para OpenCV)
@@ -34,8 +33,7 @@ CLASS_COLORS = {
     2: (0, 165, 255),    # Mouse_bite - naranja
     3: (0, 255, 255),    # Open_circuit - amarillo
     4: (255, 0, 0),      # Short - azul
-    5: (255, 0, 255),    # Spur - magenta
-    6: (128, 0, 128)     # Spurious_copper - púrpura
+    5: (255, 0, 255)     # Spur - magenta
 }
 
 # Transform

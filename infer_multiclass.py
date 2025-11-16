@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Configuración
-NUM_CLASSES = 7
+NUM_CLASSES = 6
 MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -22,8 +22,7 @@ CLASS_NAMES = [
     "Mouse_bite",
     "Open_circuit",
     "Short",
-    "Spur",
-    "Spurious_copper"
+    "Spur"
 ]
 
 # Transform
