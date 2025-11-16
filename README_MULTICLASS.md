@@ -35,15 +35,21 @@ python main_multiclass.py
 ```
 
 Este script:
-- Carga las imágenes del dataset
-- Entrena un modelo ResNet18 con 7 clases
+- Carga las imágenes del dataset (replica clase OK si `BALANCE_OK_CLASS=True`)
+- Entrena un modelo ResNet18 con 6 clases
+- Usa data augmentation específico para PCB (rotación ±5°, flips, blur suave)
+- Implementa early stopping (detiene si no mejora en 10 épocas)
 - Guarda el mejor modelo como `pcb_resnet18_multiclass.pth`
 - Genera gráficas de entrenamiento y matriz de confusión
 
 **Configuración importante:**
-- `EPOCHS = 15` - Número de épocas de entrenamiento
+- `EPOCHS = 50` - Número máximo de épocas de entrenamiento
+- `EARLY_STOPPING_PATIENCE = 10` - Detiene si no mejora en 10 épocas
+- `MIN_DELTA = 0.001` - Mejora mínima requerida para continuar
 - `BATCH_SIZE = 16` - Tamaño del lote
 - `LR = 1e-4` - Tasa de aprendizaje
+- `BALANCE_OK_CLASS = True` - Activa/desactiva replicación de clase OK
+- `OK_REPLICATION_FACTOR = 3` - Factor de replicación para balanceo
 
 ### 2. Inferencia en Imágenes
 
@@ -138,9 +144,16 @@ pip install opencv-python  # Para detección en tiempo real
 
 ## 📈 Mejoras Implementadas
 
-✅ **Clasificación multiclase** - 7 clases en lugar de binario  
-✅ **Balanceo de clases** - Pesos automáticos en la función de pérdida  
-✅ **Data augmentation** - Rotaciones, flips, color jitter  
+✅ **Clasificación multiclase** - 6 clases en lugar de binario  
+✅ **Balanceo automático de clases** - Replica imágenes OK 3x (configurable)  
+✅ **Early Stopping** - Detección automática de convergencia  
+✅ **Data augmentation optimizado para PCB**:
+  - Rotación suave ±5° (sin deformar componentes)
+  - Flips horizontal y vertical
+  - Ajustes de brillo/contraste moderados (15%)
+  - Gaussian blur suave ocasional
+  - Sin saturación ni deformaciones agresivas
+✅ **Entrenamiento extendido** - Hasta 50 épocas con early stopping  
 ✅ **Visualizaciones mejoradas** - Matriz de confusión con seaborn  
 ✅ **Script de inferencia dedicado** - Fácil uso en producción  
 ✅ **Detección en tiempo real** - Usando cámara web con OpenCV  
@@ -150,17 +163,58 @@ pip install opencv-python  # Para detección en tiempo real
 ## 🎓 Modelo
 
 - **Arquitectura**: ResNet18 (pre-entrenado en ImageNet)
-- **Fine-tuning**: Última capa adaptada a 7 clases
+- **Fine-tuning**: Última capa adaptada a 6 clases
 - **Input size**: 224x224 RGB
-- **Optimizador**: Adam
+- **Optimizador**: Adam (lr=1e-4)
 - **Loss**: CrossEntropyLoss con pesos por clase
+- **Early Stopping**: Patience=10, Min Delta=0.001
+- **Entrenamiento**: Hasta 50 épocas con detección automática de convergencia
+
+## ⚙️ Configuración de Balanceo
+
+El sistema incluye balanceo automático de la clase "OK" para compensar el desbalance entre PCBs correctos y defectuosos:
+
+```python
+BALANCE_OK_CLASS = True          # Activar/desactivar balanceo
+OK_REPLICATION_FACTOR = 3        # Replicar imágenes OK 3x
+```
+
+**¿Por qué es importante?**
+- Los datasets de PCB suelen tener pocas imágenes "OK" vs muchas con defectos
+- Sin balanceo, el modelo puede sesgar hacia detectar defectos
+- La replicación 3x mejora la detección de PCBs correctos sin afectar precisión en defectos
+
+**Cómo ajustar:**
+- `BALANCE_OK_CLASS = False` → Sin replicación (usar dataset original)
+- `OK_REPLICATION_FACTOR = 2` → Duplicar imágenes OK
+- `OK_REPLICATION_FACTOR = 5` → Replicar 5 veces (para datasets muy desbalanceados)
 
 ## 📝 Notas
 
-- El modelo usa **class weights** para manejar el desbalance entre clases
-- Se recomienda tener al menos 50-100 imágenes por clase para buenos resultados
-- El data augmentation ayuda a mejorar la generalización
-- La división es 70% train, 15% validation, 15% test
+### Data Augmentation para PCB
+El sistema usa aumentaciones **específicamente diseñadas para PCBs**:
+- **Rotación limitada a ±5°**: Evita deformar componentes y trazas críticas
+- **Sin saturación**: Los PCBs tienen colores estandarizados (verde, cobre)
+- **Blur suave**: Simula variaciones de enfoque sin perder detalles
+- **Brightness/Contrast moderado**: Simula diferentes condiciones de iluminación
+
+❌ **No usar**: Crop agresivo, deformaciones, saturación alta, rotaciones >10°
+
+### Early Stopping
+El entrenamiento se detiene automáticamente cuando:
+- No hay mejora en validation accuracy por `EARLY_STOPPING_PATIENCE` (10) épocas consecutivas
+- La mejora es menor a `MIN_DELTA` (0.001)
+- Esto previene overfitting y ahorra tiempo de entrenamiento
+
+### Balanceo de Clases
+Se usan **dos estrategias complementarias**:
+1. **Replicación de datos** (opcional): Multiplica imágenes OK por `OK_REPLICATION_FACTOR`
+2. **Class weights automáticos**: Ajusta la loss function según frecuencia de cada clase
+
+### Recomendaciones
+- Se recomienda tener al menos **50-100 imágenes por clase** para buenos resultados
+- El modelo guardado (`pcb_resnet18_multiclass.pth`) es el de **mejor validation accuracy**
+- La división es **70% train, 15% validation, 15% test** con seed fijo para reproducibilidad
 
 ## 🆚 Comparación con Versión Binaria
 
