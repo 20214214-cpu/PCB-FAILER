@@ -18,13 +18,13 @@ MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CLASS_NAMES = [
-    "ok",
-    "Missing_hole",
-    "Mouse_bite",
-    "Open_circuit",
-    "Short",
-    "Spur",
-    "Spurious_copper"
+    "Correcto",
+    "Agujero_faltante",
+    "Mordedura_ratón",
+    "Circuito_abierto",
+    "Corto_circuito",
+    "Rama_cobre",
+    "Cobre_derramado"
 ]
 
 # Colores para cada clase (BGR para OpenCV)
