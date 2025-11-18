@@ -8,10 +8,9 @@ El sistema identifica **6 clases** diferentes:
 
 1. **ok** - PCB sin defectos
 2. **Missing_hole** - Agujeros faltantes
-3. **Mouse_bite** - Mordeduras (defecto en bordes)
-4. **Open_circuit** - Circuito abierto
-5. **Short** - Cortocircuito
-6. **Spur** - Espuelas/protuberancias
+3. **Open_circuit** - Circuito abierto
+4. **Short** - Cortocircuito
+5. **Spur** - Espuelas/protuberancias
 
 ## 📁 Estructura del Dataset
 
@@ -19,7 +18,6 @@ El sistema identifica **6 clases** diferentes:
 pcb-defects/
 ├── images/
 │   ├── Missing_hole/
-│   ├── Mouse_bite/
 │   ├── Open_circuit/
 │   ├── Short/
 │   └── Spur/

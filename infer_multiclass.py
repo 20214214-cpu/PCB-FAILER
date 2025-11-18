@@ -19,7 +19,6 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLASS_NAMES = [
     "ok",
     "Missing_hole",
-    "Mouse_bite",
     "Open_circuit",
     "Short",
     "Spur"

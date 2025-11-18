@@ -22,7 +22,7 @@ MY_IMAGE = "image.png"     # tu imagen de muestra
 MY_IMAGE2 = "image2.png"     # tu imagen de muestra
 NUM_CLASSES = 2            # defective / ok
 BATCH_SIZE = 16
-EPOCHS = 8
+EPOCHS = 12
 LR = 1e-4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 OUT_MODEL = "pcb_resnet18.pth"
@@ -41,11 +41,14 @@ def build_image_list(data_dir):
                 # si contiene 'defect' o alguno de los tipos -> class 1 (defect)
                 if "PCB_USED" in root:
                     lbl = 0
+                    for i in range(3):         
+                        img_paths.append(str(p))
+                        labels.append(lbl)
                 else:
-                    # si dataset usa tipos: missing_hole, mouse_bite, open, short, spur, spurious_copper
+                    # si dataset usa tipos: missing_hole, open, short, spur, spurious_copper
                     lbl = 1
-                img_paths.append(str(p))
-                labels.append(lbl)
+                    img_paths.append(str(p))
+                    labels.append(lbl)
     return img_paths, labels
 
 # --- Dataset PyTorch ---
