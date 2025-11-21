@@ -26,15 +26,16 @@ MY_IMAGE2 = "image2.png"
 NUM_CLASSES = 5  # 4 tipos de defectos + ok
 BATCH_SIZE = 16
 EPOCHS = 50  # Entrenamiento extendido
-LR = 1e-4
+LR = 1e-5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-OUT_MODEL = "pcb_resnet18_multiclass.pth"
-BALANCE_OK_CLASS = True  # Si es True, replica imágenes OK 3x para balanceo
-OK_REPLICATION_FACTOR = 2  # Factor de replicación para clase OK
+OUT_MODEL = "pcb_resnet50_multiclass.pth"
+BALANCE_OK_CLASS = False  # Si es True, replica imágenes OK 3x para balanceo
+ENHANCE_WEIGHT_OK_CLASS = True  # Si es True, aumenta peso de clase OK en la pérdida
+OK_REPLICATION_FACTOR = 1.05  # Factor de replicación para clase OK
 
 # Early Stopping
 EARLY_STOPPING_PATIENCE = 5  # Detener si no mejora en N epochs
-MIN_DELTA = 0.001  # Mejora mínima para considerar progreso
+MIN_DELTA = 0.0001  # Mejora mínima para considerar progreso
 
 # Mapeo de clases
 CLASS_NAMES = [
@@ -108,25 +109,19 @@ class PCBClassDataset(Dataset):
 
 # --- Transforms - Aumentaciones específicas para PCB ---
 train_tf = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(p=0.5),  # Flip horizontal
-    transforms.RandomVerticalFlip(p=0.5),     # Flip vertical
-    transforms.RandomRotation(10),              # Rotación suave ±5°
-    transforms.RandomResizedCrop(
-        size=224, 
-        scale=(0.8, 1.0), # Recorta entre 80% y 100% del tamaño original
-        ratio=(0.95, 1.05)
-    ),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05),
-    transforms.RandomPerspective(distortion_scale=0.2, p=0.3), # Opcional: Probar si mejora el rendimiento
-    transforms.GaussianBlur(kernel_size=5, sigma=(0.5, 1.5)),
+    transforms.Resize((400,400)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomVerticalFlip(p=0.5),
+    transforms.RandomRotation(5), # Baja la rotación
+    # transforms.RandomPerspective(distortion_scale=0.1, p=0.1), # Opcional: Probar si mejora el rendimiento
+    # transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)), # O más suave
+    transforms.ColorJitter(brightness=0.1, contrast=0.1), # Menos agresivo
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
 ])
 
 val_tf = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((400,400)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -184,8 +179,8 @@ train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_wo
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
-# --- Model (ResNet18 fine-tune) ---
-model = models.resnet18(pretrained=True)
+# --- Model (resnet50 fine-tune) ---
+model = models.resnet50(pretrained=True)
 in_features = model.fc.in_features
 model.fc = nn.Linear(in_features, NUM_CLASSES)
 model = model.to(DEVICE)
@@ -197,6 +192,10 @@ for i in range(NUM_CLASSES):
     count = sum(1 for lbl in labels if lbl == i)
     weight = total / (NUM_CLASSES * count) if count > 0 else 1.0
     class_weights.append(weight)
+
+if ENHANCE_WEIGHT_OK_CLASS:
+    ok_class_index = CLASS_NAMES.index("ok")
+    class_weights[ok_class_index] *= OK_REPLICATION_FACTOR
 
 class_weights = torch.FloatTensor(class_weights).to(DEVICE)
 criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -386,7 +385,7 @@ for img_path in [MY_IMAGE, MY_IMAGE2]:
 
 # --- Generar grafo del modelo ---
 print("\n=== Generando grafo del modelo ===")
-dummy_input = torch.randn(1, 3, 224, 224).to(DEVICE)
+dummy_input = torch.randn(1, 3, 400,400).to(DEVICE)
 
 model_graph = make_dot(
     model(dummy_input),
