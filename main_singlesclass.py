@@ -12,7 +12,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 import torchvision.transforms.functional as TF
 
-from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, roc_curve, auc
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from torchviz import make_dot
 
@@ -89,18 +90,36 @@ n_ok = len(labels) - n_def
 print("Defective:", n_def, "OK:", n_ok)
 
 # Create dataset & splits
-dataset = PCBClassDataset(img_paths, labels, transform=None)
-# create indices and splits
-n = len(dataset)
-n_train = int(0.7*n)
-n_val = int(0.15*n)
-n_test = n - n_train - n_val
-train_set, val_set, test_set = random_split(dataset, [n_train, n_val, n_test],
-                                           generator=torch.Generator().manual_seed(42))
-# attach transforms separately (random_split returns Subset, so we wrap)
-train_set.dataset.transform = train_tf
-val_set.dataset.transform = val_tf
-test_set.dataset.transform = val_tf
+# Estrategia de división estratificada
+indices = np.arange(len(labels))
+train_idx, temp_idx = train_test_split(
+    indices, 
+    test_size=0.3, 
+    stratify=labels, 
+    random_state=42
+)
+
+temp_labels = [labels[i] for i in temp_idx]
+val_idx, test_idx = train_test_split(
+    temp_idx, 
+    test_size=0.5, 
+    stratify=temp_labels, 
+    random_state=42
+)
+
+def get_subset(paths, labs, idxs):
+    return [paths[i] for i in idxs], [labs[i] for i in idxs]
+
+train_paths, train_labels = get_subset(img_paths, labels, train_idx)
+val_paths, val_labels = get_subset(img_paths, labels, val_idx)
+test_paths, test_labels = get_subset(img_paths, labels, test_idx)
+
+# Crear datasets independientes
+train_set = PCBClassDataset(train_paths, train_labels, transform=train_tf)
+val_set = PCBClassDataset(val_paths, val_labels, transform=val_tf)
+test_set = PCBClassDataset(test_paths, test_labels, transform=val_tf)
+
+print(f"Split sizes: Train={len(train_set)}, Val={len(val_set)}, Test={len(test_set)}")
 
 train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
@@ -156,14 +175,18 @@ for epoch in range(EPOCHS):
 model.load_state_dict(torch.load(OUT_MODEL, map_location=DEVICE))
 model.eval()
 y_true, y_pred = [], []
+y_scores = []
 
 with torch.no_grad():
     for imgs, labs in test_loader:
         imgs = imgs.to(DEVICE)
         outs = model(imgs)
+        probs = torch.softmax(outs, dim=1)
         preds = torch.argmax(outs, dim=1).cpu().numpy()
         y_pred.extend(preds.tolist())
         y_true.extend(labs.numpy().tolist())
+        # Para binario, nos interesa la probabilidad de la clase positiva (1)
+        y_scores.extend(probs.cpu().numpy()[:, 1].tolist())
 
 # ⚡️ Fuerza a sklearn a usar ambas clases incluso si falta una
 labels_all = [0, 1]
@@ -171,6 +194,24 @@ cm = confusion_matrix(y_true, y_pred, labels=labels_all)
 print("Confusion Matrix:\n", cm)
 
 print(classification_report(y_true, y_pred, labels=labels_all, target_names=["ok", "defective"]))
+
+# --- ROC & AUC ---
+print("\nGenerando curva ROC...")
+fpr, tpr, _ = roc_curve(y_true, y_scores)
+roc_auc = auc(fpr, tpr)
+
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (Binary)')
+plt.legend(loc="lower right")
+plt.grid(alpha=0.3)
+plt.savefig("roc_curve_binary.png")
+print("Saved roc_curve_binary.png")
 
 
 # --- Guardar matriz como figura ---

@@ -11,10 +11,13 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 import torchvision.transforms.functional as TF
 
-from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, roc_curve, auc
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torchviz import make_dot
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
 
 # -------- CONFIG ----------
 DATA_DIR = "pcb-defects"
@@ -137,21 +140,40 @@ for name, count in class_counts.items():
     print(f"{name}: {count}")
 
 # Create dataset & splits
-dataset = PCBClassDataset(img_paths, labels, transform=None)
-n = len(dataset)
-n_train = int(0.7 * n)
-n_val = int(0.15 * n)
-n_test = n - n_train - n_val
-
-train_set, val_set, test_set = random_split(
-    dataset, [n_train, n_val, n_test],
-    generator=torch.Generator().manual_seed(42)
+# Estrategia de división estratificada para asegurar % de cada clase en test
+# 1. Separar Train (70%) del resto (30%)
+indices = np.arange(len(labels))
+train_idx, temp_idx = train_test_split(
+    indices, 
+    test_size=0.3, 
+    stratify=labels, 
+    random_state=42
 )
 
-# Attach transforms
-train_set.dataset.transform = train_tf
-val_set.dataset.transform = val_tf
-test_set.dataset.transform = val_tf
+# 2. Separar Val (15%) y Test (15%) del resto (que es el 30% original -> dividir a la mitad)
+# Necesitamos las etiquetas correspondientes a temp_idx para estratificar
+temp_labels = [labels[i] for i in temp_idx]
+val_idx, test_idx = train_test_split(
+    temp_idx, 
+    test_size=0.5, 
+    stratify=temp_labels, 
+    random_state=42
+)
+
+# Helper para filtrar listas
+def get_subset(paths, labs, idxs):
+    return [paths[i] for i in idxs], [labs[i] for i in idxs]
+
+train_paths, train_labels = get_subset(img_paths, labels, train_idx)
+val_paths, val_labels = get_subset(img_paths, labels, val_idx)
+test_paths, test_labels = get_subset(img_paths, labels, test_idx)
+
+# Crear datasets independientes con sus transformaciones correctas
+train_set = PCBClassDataset(train_paths, train_labels, transform=train_tf)
+val_set = PCBClassDataset(val_paths, val_labels, transform=val_tf)
+test_set = PCBClassDataset(test_paths, test_labels, transform=val_tf)
+
+print(f"Split sizes: Train={len(train_set)}, Val={len(val_set)}, Test={len(test_set)}")
 
 train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
@@ -265,14 +287,17 @@ print("\n=== Evaluación en Test ===")
 model.load_state_dict(torch.load(OUT_MODEL, map_location=DEVICE))
 model.eval()
 y_true, y_pred = [], []
+y_scores = []
 
 with torch.no_grad():
     for imgs, labs in test_loader:
         imgs = imgs.to(DEVICE)
         outs = model(imgs)
+        probs = torch.softmax(outs, dim=1)
         preds = torch.argmax(outs, dim=1).cpu().numpy()
         y_pred.extend(preds.tolist())
         y_true.extend(labs.numpy().tolist())
+        y_scores.extend(probs.cpu().numpy().tolist())
 
 # Confusion Matrix
 cm = confusion_matrix(y_true, y_pred, labels=list(range(NUM_CLASSES)))
@@ -283,6 +308,36 @@ print(cm)
 print("\nClassification Report:")
 print(classification_report(y_true, y_pred, labels=list(range(NUM_CLASSES)), 
                           target_names=CLASS_NAMES, zero_division=0))
+
+# --- ROC & AUC ---
+print("\nGenerando curvas ROC...")
+y_true_bin = label_binarize(y_true, classes=range(NUM_CLASSES))
+y_scores = np.array(y_scores)
+
+fpr = dict()
+tpr = dict()
+roc_auc = dict()
+
+for i in range(NUM_CLASSES):
+    fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], y_scores[:, i])
+    roc_auc[i] = auc(fpr[i], tpr[i])
+
+plt.figure(figsize=(10, 8))
+colors = cycle(['blue', 'red', 'green', 'orange', 'purple', 'brown'])
+for i, color in zip(range(NUM_CLASSES), colors):
+    plt.plot(fpr[i], tpr[i], color=color, lw=2,
+             label=f'Class {CLASS_NAMES[i]} (AUC = {roc_auc[i]:0.2f})')
+
+plt.plot([0, 1], [0, 1], 'k--', lw=2)
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Multiclass ROC Curve')
+plt.legend(loc="lower right")
+plt.grid(alpha=0.3)
+plt.savefig("roc_curve_multiclass.png")
+print("Saved roc_curve_multiclass.png")
 
 # --- Visualizar matriz de confusión ---
 plt.figure(figsize=(10, 8))
