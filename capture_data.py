@@ -1,6 +1,7 @@
 import cv2
 import os
 import time
+import argparse
 from pathlib import Path
 
 # ==========================================
@@ -13,10 +14,9 @@ BASE_DIR = "pcb-defects"
 CLASSES = {
     '0': {"name": "PCB_USED (OK)",     "path": os.path.join(BASE_DIR, "PCB_USED")},
     '1': {"name": "Missing_hole",      "path": os.path.join(BASE_DIR, "images", "Missing_hole")},
-    '2': {"name": "Mouse_bite",        "path": os.path.join(BASE_DIR, "images", "Mouse_bite")}, # Incluido por compatibilidad
-    '3': {"name": "Open_circuit",      "path": os.path.join(BASE_DIR, "images", "Open_circuit")},
-    '4': {"name": "Short",             "path": os.path.join(BASE_DIR, "images", "Short")},
-    '5': {"name": "Spur",              "path": os.path.join(BASE_DIR, "images", "Spur")},
+    '2': {"name": "Open_circuit",      "path": os.path.join(BASE_DIR, "images", "Open_circuit")},
+    '3': {"name": "Short",             "path": os.path.join(BASE_DIR, "images", "Short")},
+    '4': {"name": "Spur",              "path": os.path.join(BASE_DIR, "images", "Spur")},
 }
 
 def create_directories():
@@ -27,12 +27,16 @@ def create_directories():
         print(f"  [OK] {info['path']}")
 
 def main():
+    parser = argparse.ArgumentParser(description="Herramienta de captura de datos PCB")
+    parser.add_argument("--camera", type=int, default=0, help="Índice de la cámara (default: 0)")
+    args = parser.parse_args()
+
     create_directories()
     
     # Intentar abrir la cámara
     # 0 suele ser la webcam integrada, 1 una externa USB
-    print("\nIniciando cámara...")
-    cap = cv2.VideoCapture(0)
+    print(f"\nIniciando cámara {args.camera}...")
+    cap = cv2.VideoCapture(args.camera)
     
     if not cap.isOpened():
         print("Error: No se pudo acceder a la cámara (índice 0).")

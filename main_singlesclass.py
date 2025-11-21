@@ -42,10 +42,14 @@ def build_image_list(data_dir):
                 # si contiene 'defect' o alguno de los tipos -> class 1 (defect)
                 if "PCB_USED" in root:
                     lbl = 0
-                    for i in range(3):         
+                    for i in range(2):         
                         img_paths.append(str(p))
                         labels.append(lbl)
                 else:
+                    # Ignorar Mouse_bite
+                    if "Mouse_bite" in root:
+                        continue
+                        
                     # si dataset usa tipos: missing_hole, open, short, spur, spurious_copper
                     lbl = 1
                     img_paths.append(str(p))

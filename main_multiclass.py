@@ -23,35 +23,33 @@ from itertools import cycle
 DATA_DIR = "pcb-defects"
 MY_IMAGE = "image.png"
 MY_IMAGE2 = "image2.png"
-NUM_CLASSES = 6  # 5 tipos de defectos + ok
+NUM_CLASSES = 5  # 4 tipos de defectos + ok
 BATCH_SIZE = 16
 EPOCHS = 50  # Entrenamiento extendido
 LR = 1e-4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 OUT_MODEL = "pcb_resnet18_multiclass.pth"
 BALANCE_OK_CLASS = True  # Si es True, replica imágenes OK 3x para balanceo
-OK_REPLICATION_FACTOR = 3  # Factor de replicación para clase OK
+OK_REPLICATION_FACTOR = 2  # Factor de replicación para clase OK
 
 # Early Stopping
-EARLY_STOPPING_PATIENCE = 10  # Detener si no mejora en N epochs
+EARLY_STOPPING_PATIENCE = 5  # Detener si no mejora en N epochs
 MIN_DELTA = 0.001  # Mejora mínima para considerar progreso
 
 # Mapeo de clases
 CLASS_NAMES = [
     "ok",                  # 0
     "Missing_hole",        # 1
-    "Mouse_bite",          # 2
-    "Open_circuit",        # 3
-    "Short",               # 4
-    "Spur"                 # 5
+    "Open_circuit",        # 2
+    "Short",               # 3
+    "Spur"                 # 4
 ]
 
 DEFECT_FOLDERS = {
     "Missing_hole": 1,
-    "Mouse_bite": 2,
-    "Open_circuit": 3,
-    "Short": 4,
-    "Spur": 5
+    "Open_circuit": 2,
+    "Short": 3,
+    "Spur": 4
 }
 # --------------------------
 
@@ -113,11 +111,18 @@ train_tf = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(p=0.5),  # Flip horizontal
     transforms.RandomVerticalFlip(p=0.5),     # Flip vertical
-    transforms.RandomRotation(5),              # Rotación suave ±5°
-    transforms.ColorJitter(brightness=0.15, contrast=0.15),  # Ajustes de iluminación suaves
-    transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),  # Blur suave ocasional
+    transforms.RandomRotation(10),              # Rotación suave ±5°
+    transforms.RandomResizedCrop(
+        size=224, 
+        scale=(0.8, 1.0), # Recorta entre 80% y 100% del tamaño original
+        ratio=(0.95, 1.05)
+    ),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05),
+    transforms.RandomPerspective(distortion_scale=0.2, p=0.3), # Opcional: Probar si mejora el rendimiento
+    transforms.GaussianBlur(kernel_size=5, sigma=(0.5, 1.5)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
 ])
 
 val_tf = transforms.Compose([

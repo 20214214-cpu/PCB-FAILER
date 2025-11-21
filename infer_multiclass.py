@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Configuración
-NUM_CLASSES = 6
+NUM_CLASSES = 5
 MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

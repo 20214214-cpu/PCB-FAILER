@@ -13,14 +13,13 @@ import numpy as np
 import time
 
 # Configuración
-NUM_CLASSES = 6
+NUM_CLASSES = 5
 MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CLASS_NAMES = [
     "Correcto",
     "Agujero_faltante",
-    "Mordedura_ratón",
     "Circuito_abierto",
     "Corto_circuito",
     "Rama_cobre",
@@ -30,10 +29,9 @@ CLASS_NAMES = [
 CLASS_COLORS = {
     0: (0, 255, 0),      # ok - verde
     1: (0, 0, 255),      # Missing_hole - rojo
-    2: (0, 165, 255),    # Mouse_bite - naranja
-    3: (0, 255, 255),    # Open_circuit - amarillo
-    4: (255, 0, 0),      # Short - azul
-    5: (255, 0, 255)     # Spur - magenta
+    2: (0, 255, 255),    # Open_circuit - amarillo
+    3: (255, 0, 0),      # Short - azul
+    4: (255, 0, 255)     # Spur - magenta
 }
 
 # Transform
