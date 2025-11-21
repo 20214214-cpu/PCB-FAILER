@@ -34,10 +34,10 @@ python main_multiclass.py
 
 Este script:
 - Carga las imágenes del dataset (replica clase OK si `BALANCE_OK_CLASS=True`)
-- Entrena un modelo resnet50 con 6 clases
+- Entrena un modelo resnet18 con 6 clases
 - Usa data augmentation específico para PCB (rotación ±5°, flips, blur suave)
 - Implementa early stopping (detiene si no mejora en 10 épocas)
-- Guarda el mejor modelo como `pcb_resnet50_multiclass.pth`
+- Guarda el mejor modelo como `pcb_resnet18_multiclass.pth`
 - Genera gráficas de entrenamiento y matriz de confusión
 
 **Configuración importante:**
@@ -119,7 +119,7 @@ Probabilidades completas:
 ## 📊 Outputs Generados
 
 Durante el entrenamiento:
-- `pcb_resnet50_multiclass.pth` - Modelo entrenado
+- `pcb_resnet18_multiclass.pth` - Modelo entrenado
 - `training_history.png` - Gráficas de loss y accuracy
 - `confusion_matrix_multiclass.png` - Matriz de confusión
 - `pcb_model_graph_multiclass.png` - Arquitectura del modelo
@@ -160,7 +160,7 @@ pip install opencv-python  # Para detección en tiempo real
 
 ## 🎓 Modelo
 
-- **Arquitectura**: resnet50 (pre-entrenado en ImageNet)
+- **Arquitectura**: resnet18 (pre-entrenado en ImageNet)
 - **Fine-tuning**: Última capa adaptada a 6 clases
 - **Input size**: 224x224 RGB
 - **Optimizador**: Adam (lr=1e-4)
@@ -211,7 +211,7 @@ Se usan **dos estrategias complementarias**:
 
 ### Recomendaciones
 - Se recomienda tener al menos **50-100 imágenes por clase** para buenos resultados
-- El modelo guardado (`pcb_resnet50_multiclass.pth`) es el de **mejor validation accuracy**
+- El modelo guardado (`pcb_resnet18_multiclass.pth`) es el de **mejor validation accuracy**
 - La división es **70% train, 15% validation, 15% test** con seed fijo para reproducibilidad
 
 ## 🆚 Comparación con Versión Binaria

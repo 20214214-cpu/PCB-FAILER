@@ -18,7 +18,7 @@ from tqdm import tqdm
 # CONFIGURACIÓN
 # ==========================================
 DATA_DIR = "pcb-defects"
-MODEL_PATH = "pcb_resnet50_multiclass.pth"
+MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 32
 SEED = 42
@@ -122,7 +122,7 @@ def evaluate_dummy(X_test, y_test, strategy="most_frequent"):
 
 def evaluate_model(model, dataloader):
     """Evalúa el modelo de Deep Learning"""
-    print(f"\n--- Evaluando Modelo resnet50 ({MODEL_PATH}) ---")
+    print(f"\n--- Evaluando Modelo resnet18 ({MODEL_PATH}) ---")
     model.eval()
     all_preds = []
     all_labels = []
@@ -187,10 +187,10 @@ def main():
     acc_random, preds_random = evaluate_dummy(dummy_features, test_labels, strategy="stratified")
     
     # ---------------------------------------------------------
-    # MODELO: resnet50 Entrenado
+    # MODELO: resnet18 Entrenado
     # ---------------------------------------------------------
     # Cargar arquitectura
-    model = models.resnet50(pretrained=False)
+    model = models.resnet18(pretrained=False)
     model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
     
     try:
@@ -225,7 +225,7 @@ def main():
     print("="*40)
     print(f"1. Azar Proporcional (Baseline): {acc_random*100:.2f}%")
     print(f"2. Clase Mayoritaria (Baseline): {acc_dummy*100:.2f}%")
-    print(f"3. Tu Modelo resnet50:           {acc_model*100:.2f}%")
+    print(f"3. Tu Modelo resnet18:           {acc_model*100:.2f}%")
     print("="*40)
     
     if acc_model > acc_dummy:

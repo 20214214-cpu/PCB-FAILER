@@ -1,7 +1,7 @@
 """
 Detección de defectos en PCB (binaria) en tiempo real usando cámara web
 Uso:
-    python infer_realtime_monoclass.py --camera 0 --model pcb_resnet50.pth
+    python infer_realtime_monoclass.py --camera 0 --model pcb_resnet18.pth
 """
 
 import argparse
@@ -15,7 +15,7 @@ import time
 
 # ================== CONFIG ==================
 NUM_CLASSES = 2
-MODEL_PATH = "pcb_resnet50.pth"
+MODEL_PATH = "pcb_resnet18.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 0 = OK, 1 = Defectuoso
@@ -42,7 +42,7 @@ transform = transforms.Compose([
 def load_model(model_path):
     """Carga el modelo entrenado binario (2 clases)."""
     print(f"Cargando modelo desde {model_path}...")
-    model = models.resnet50(pretrained=False)
+    model = models.resnet18(pretrained=False)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, NUM_CLASSES)
     model.load_state_dict(torch.load(model_path, map_location=DEVICE))

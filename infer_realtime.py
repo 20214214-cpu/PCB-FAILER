@@ -14,7 +14,7 @@ import time
 
 # Configuración
 NUM_CLASSES = 5
-MODEL_PATH = "pcb_resnet50_multiclass.pth"
+MODEL_PATH = "pcb_resnet18_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CLASS_NAMES = [
@@ -44,7 +44,7 @@ transform = transforms.Compose([
 def load_model(model_path):
     """Carga el modelo entrenado"""
     print(f"Cargando modelo desde {model_path}...")
-    model = models.resnet50(pretrained=False)
+    model = models.resnet18(pretrained=False)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, NUM_CLASSES)
     model.load_state_dict(torch.load(model_path, map_location=DEVICE))

@@ -28,7 +28,7 @@ BATCH_SIZE = 16
 EPOCHS = 50  # Entrenamiento extendido
 LR = 1e-5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-OUT_MODEL = "pcb_resnet50_multiclass.pth"
+OUT_MODEL = "pcb_resnet18_multiclass.pth"
 BALANCE_OK_CLASS = False  # Si es True, replica imágenes OK 3x para balanceo
 ENHANCE_WEIGHT_OK_CLASS = True  # Si es True, aumenta peso de clase OK en la pérdida
 OK_REPLICATION_FACTOR = 1.05  # Factor de replicación para clase OK
@@ -179,8 +179,8 @@ train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_wo
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
-# --- Model (resnet50 fine-tune) ---
-model = models.resnet50(pretrained=True)
+# --- Model (resnet18 fine-tune) ---
+model = models.resnet18(pretrained=True)
 in_features = model.fc.in_features
 model.fc = nn.Linear(in_features, NUM_CLASSES)
 model = model.to(DEVICE)
