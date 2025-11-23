@@ -26,7 +26,7 @@ BATCH_SIZE = 16
 EPOCHS = 12
 LR = 1e-4
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-OUT_MODEL = "pcb_resnet18.pth"
+OUT_MODEL = "pcb_resnet50.pth"
 # --------------------------
 
 def build_image_list(data_dir):
@@ -46,9 +46,6 @@ def build_image_list(data_dir):
                         img_paths.append(str(p))
                         labels.append(lbl)
                 else:
-                    # Ignorar Mouse_bite
-                    if "Mouse_bite" in root:
-                        continue
                         
                     # si dataset usa tipos: missing_hole, open, short, spur, spurious_copper
                     lbl = 1
@@ -129,8 +126,8 @@ train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_wo
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
-# --- Model (resnet18 fine-tune) ---
-model = models.resnet18(pretrained=True)
+# --- Model (resnet50 fine-tune) ---
+model = models.resnet50(pretrained=True)
 # replace final layer
 in_features = model.fc.in_features
 model.fc = nn.Linear(in_features, NUM_CLASSES)

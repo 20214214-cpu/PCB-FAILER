@@ -1,16 +1,16 @@
 # PCB Defect Detection - Clasificación Multiclase
 
-Sistema de detección automática de defectos en PCB usando Deep Learning con clasificación multiclase.
+Sistema de detección automática de defectos en PCB usando redes convolucionales y clasificación multiclase.
 
 ## 🎯 Clases Detectadas
 
-El sistema identifica **6 clases** diferentes:
+El sistema trabaja actualmente con **5 clases**:
 
-1. **ok** - PCB sin defectos
-2. **Missing_hole** - Agujeros faltantes
-3. **Open_circuit** - Circuito abierto
-4. **Short** - Cortocircuito
-5. **Spur** - Espuelas/protuberancias
+1. **ok** – PCB sin defectos
+2. **Missing_hole** – Agujeros faltantes
+3. **Open_circuit** – Circuito abierto
+4. **Short** – Cortocircuito
+5. **Spur** – Espuelas/protuberancias
 
 ## 📁 Estructura del Dataset
 
@@ -21,83 +21,48 @@ pcb-defects/
 │   ├── Open_circuit/
 │   ├── Short/
 │   └── Spur/
-└── PCB_USED/  (imágenes sin defectos)
+└── PCB_USED/              # Imágenes sin defectos (clase ok)
 ```
 
 ## 🚀 Uso
 
-### 1. Entrenamiento del Modelo
+### 1. Entrenamiento del Modelo (ResNet-18)
 
 ```bash
 python main_multiclass.py
 ```
 
-Este script:
-- Carga las imágenes del dataset (replica clase OK si `BALANCE_OK_CLASS=True`)
-- Entrena un modelo resnet18 con 6 clases
-- Usa data augmentation específico para PCB (rotación ±5°, flips, blur suave)
-- Implementa early stopping (detiene si no mejora en 10 épocas)
-- Guarda el mejor modelo como `pcb_resnet18_multiclass.pth`
-- Genera gráficas de entrenamiento y matriz de confusión
+El script de entrenamiento:
+- Construye el dataset con división estratificada 70/15/15.
+- Aplica data augmentation específico para PCB (resize 400×400, flips, rotación ±5°, color jitter leve).
+- Entrena una **ResNet-18** preentrenada adaptada a 5 clases.
+- Usa `WeightedRandomSampler` y pesos en la pérdida para manejar desbalance.
+- Implementa early stopping con paciencia 10 y `MIN_DELTA = 1e-4`.
+- Reduce el learning rate ×0.5 cuando no hay mejora en validación durante 3 épocas consecutivas.
+- Guarda el mejor modelo como `pcb_resnet18_multiclass.pth`.
+- Genera gráficas de loss/accuracy, matriz de confusión y curva ROC.
 
-**Configuración importante:**
-- `EPOCHS = 50` - Número máximo de épocas de entrenamiento
-- `EARLY_STOPPING_PATIENCE = 10` - Detiene si no mejora en 10 épocas
-- `MIN_DELTA = 0.001` - Mejora mínima requerida para continuar
-- `BATCH_SIZE = 16` - Tamaño del lote
-- `LR = 1e-4` - Tasa de aprendizaje
-- `BALANCE_OK_CLASS = True` - Activa/desactiva replicación de clase OK
-- `OK_REPLICATION_FACTOR = 3` - Factor de replicación para balanceo
+**Parámetros clave (ver `main_multiclass.py`):**
+- `EPOCHS = 50`
+- `BATCH_SIZE = 16`
+- `LR = 1e-5`
+- `EARLY_STOPPING_PATIENCE = 10`
+- `LR_REDUCE_PATIENCE = 3`
+- `LR_REDUCE_FACTOR = 0.5`
+- `MIN_DELTA = 1e-4`
+- `OK_REPLICATION_FACTOR = 1.05` (si `BALANCE_OK_CLASS = True`)
 
-### 2. Inferencia en Imágenes
+### 2. Inferencia en Imágenes (ResNet-50)
 
-#### Imagen individual:
 ```bash
 python infer_multiclass.py --image ruta/a/imagen.png
-```
-
-#### Múltiples imágenes:
-```bash
-python infer_multiclass.py --batch imagen1.png imagen2.png imagen3.png
-```
-
-#### Sin visualización:
-```bash
+python infer_multiclass.py --batch img1.png img2.png
 python infer_multiclass.py --image test.png --no-plot
 ```
 
-### 3. Detección en Tiempo Real (Cámara Web)
+El script de inferencia carga el modelo `pcb_resnet50_multiclass.pth`, ajusta las entradas a 512×512 y produce una visualización con la confianza por clase (opcionalmente guardada como `prediction_{class}_{name}.png`).
 
-```bash
-# Usar cámara predeterminada (0)
-python infer_realtime.py
-
-# Especificar cámara
-python infer_realtime.py --camera 1
-
-# Listar cámaras disponibles
-python infer_realtime.py --list
-
-# Con resolución personalizada
-python infer_realtime.py --camera 0 --width 1920 --height 1080
-```
-
-**Controles durante la ejecución:**
-- `q` - Salir
-- `s` - Guardar captura de pantalla
-- `c` - Cambiar cámara
-- `SPACE` - Pausar/Reanudar
-
-**Características:**
-- ✅ Predicción en tiempo real con FPS
-- ✅ Visualización de probabilidades por clase
-- ✅ Colores distintivos para cada tipo de defecto
-- ✅ Captura de pantallas con nombre automático
-- ✅ Selector de cámara en vivo
-- ✅ Interfaz visual optimizada
-
-### 4. Ejemplo de Salida
-
+**Ejemplo de salida:**
 ```
 Analizando imagen: test_pcb.png
 
@@ -109,26 +74,66 @@ RESULTADO:
 Probabilidades completas:
   ok                  :   2.15%
   Missing_hole        :  94.23%
-  Mouse_bite          :   1.45%
   Open_circuit        :   0.87%
   Short               :   0.65%
-  Spur                :   0.42%
+  Spur                :   2.10%
 ==================================================
 ```
 
+### 3. Detección en Tiempo Real (Webcam)
+
+```bash
+python infer_realtime.py              # Cámara predeterminada
+python infer_realtime.py --camera 1   # Selecciona cámara
+python infer_realtime.py --list       # Lista cámaras disponibles
+python infer_realtime.py --camera 0 --width 1920 --height 1080
+```
+
+Controles durante la ejecución: `q` (salir), `s` (captura), `c` (cambiar cámara), `SPACE` (pausa).
+
 ## 📊 Outputs Generados
 
-Durante el entrenamiento:
-- `pcb_resnet18_multiclass.pth` - Modelo entrenado
-- `training_history.png` - Gráficas de loss y accuracy
-- `confusion_matrix_multiclass.png` - Matriz de confusión
-- `pcb_model_graph_multiclass.png` - Arquitectura del modelo
+Durante entrenamiento:
+- `pcb_resnet18_multiclass.pth`
+- `training_history.png`
+- `confusion_matrix_multiclass.png`
+- `roc_curve_multiclass.png`
+- `pcb_model_graph_multiclass.png`
 
-Durante la inferencia:
-- `prediction_{class}_{name}.png` - Visualización de la predicción
+Durante inferencia:
+- `prediction_{class}_{name}.png`
 
 Durante detección en tiempo real:
-- `capture_{n}_{class}.png` - Capturas guardadas con `s`
+- `capture_{n}_{class}.png`
+
+## 📐 Métricas Clave y Teoría
+
+Todas las métricas se derivan de la **matriz de confusión**, que contabiliza verdaderos positivos (TP), falsos positivos (FP), verdaderos negativos (TN) y falsos negativos (FN) por clase. A partir de ella se calculan:
+
+- **Accuracy**: Proporción de predicciones correctas sobre el total.
+  - Fórmula: `Accuracy = (TP + TN) / (TP + TN + FP + FN)`
+  - Útil como medida global, pero puede sesgarse si las clases están desbalanceadas.
+
+- **Precision**: Qué porcentaje de las predicciones positivas son correctas.
+  - Fórmula: `Precision = TP / (TP + FP)`
+  - Alta precisión implica pocos falsos positivos.
+
+- **Recall (Sensibilidad)**: Qué porcentaje de los ejemplos positivos reales se detectan.
+  - Fórmula: `Recall = TP / (TP + FN)`
+  - Alta sensibilidad implica pocos falsos negativos, clave para no omitir defectos.
+
+- **F1-Score**: Media armónica entre precision y recall.
+  - Fórmula: `F1 = 2 * Precision * Recall / (Precision + Recall)`
+  - Equilibra ambos indicadores; útil cuando se requiere balancear FP y FN.
+
+- **ROC (Receiver Operating Characteristic)**: Curva que grafica la tasa de verdaderos positivos (TPR) frente a la tasa de falsos positivos (FPR) al variar el umbral de decisión.
+  - `TPR = TP / (TP + FN)`, `FPR = FP / (FP + TN)`
+  - En multiclase se calcula una curva por clase usando estrategia one-vs-all.
+
+- **AUC (Area Under the Curve)**: Área bajo la curva ROC.
+  - Valor entre 0 y 1; cuanto más cercano a 1, mejor es la separabilidad entre clases.
+
+La combinación de estas métricas permite evaluar no solo la tasa global de aciertos, sino también cómo se comporta el modelo ante cada tipo de defecto. El proyecto genera reportes con precision, recall y F1 por clase, además de la matriz de confusión y curvas ROC para análisis visual.
 
 ## 🔧 Requisitos
 
@@ -137,92 +142,50 @@ pip install torch torchvision
 pip install pillow numpy matplotlib seaborn
 pip install scikit-learn tqdm
 pip install torchviz graphviz
-pip install opencv-python  # Para detección en tiempo real
+pip install opencv-python            # Para tiempo real
 ```
 
 ## 📈 Mejoras Implementadas
 
-✅ **Clasificación multiclase** - 6 clases en lugar de binario  
-✅ **Balanceo automático de clases** - Replica imágenes OK 3x (configurable)  
-✅ **Early Stopping** - Detección automática de convergencia  
-✅ **Data augmentation optimizado para PCB**:
-  - Rotación suave ±5° (sin deformar componentes)
-  - Flips horizontal y vertical
-  - Ajustes de brillo/contraste moderados (15%)
-  - Gaussian blur suave ocasional
-  - Sin saturación ni deformaciones agresivas
-✅ **Entrenamiento extendido** - Hasta 50 épocas con early stopping  
-✅ **Visualizaciones mejoradas** - Matriz de confusión con seaborn  
-✅ **Script de inferencia dedicado** - Fácil uso en producción  
-✅ **Detección en tiempo real** - Usando cámara web con OpenCV  
-✅ **Selector de cámara interactivo** - Cambio dinámico de fuente  
-✅ **Métricas detalladas** - Classification report por clase  
+- ✅ Clasificación multiclase (5 clases) en lugar de binaria.
+- ✅ Balanceo mediante sampler ponderado, pesos en la loss y réplica opcional de clase OK.
+- ✅ Early stopping con paciencia extendida y reducción dinámica de LR.
+- ✅ Data augmentation ajustado a PCB (400×400, rotaciones suaves, flips, ajustes leves de color).
+- ✅ Visualizaciones de entrenamiento, matriz de confusión y curvas ROC.
+- ✅ Script de inferencia dedicado con visualización clara de probabilidades.
+- ✅ Flujo de detección en tiempo real con OpenCV y controles interactivos.
 
-## 🎓 Modelo
+## 🎓 Modelos
 
-- **Arquitectura**: resnet18 (pre-entrenado en ImageNet)
-- **Fine-tuning**: Última capa adaptada a 6 clases
-- **Input size**: 224x224 RGB
-- **Optimizador**: Adam (lr=1e-4)
-- **Loss**: CrossEntropyLoss con pesos por clase
-- **Early Stopping**: Patience=10, Min Delta=0.001
-- **Entrenamiento**: Hasta 50 épocas con detección automática de convergencia
+- **Entrenamiento:** ResNet-18 preentrenada (entrada 400×400). Optimización con Adam (`lr=1e-5`), CrossEntropyLoss con pesos por clase y refuerzo opcional para "ok".
+- **Inferencia:** ResNet-50 finetuneada para 5 clases (`pcb_resnet50_multiclass.pth`), entrada 512×512, usada en `infer_multiclass.py` e `infer_realtime.py`.
 
 ## ⚙️ Configuración de Balanceo
 
-El sistema incluye balanceo automático de la clase "OK" para compensar el desbalance entre PCBs correctos y defectuosos:
-
 ```python
-BALANCE_OK_CLASS = True          # Activar/desactivar balanceo
-OK_REPLICATION_FACTOR = 3        # Replicar imágenes OK 3x
+BALANCE_OK_CLASS = False
+OK_REPLICATION_FACTOR = 1.05
 ```
 
-**¿Por qué es importante?**
-- Los datasets de PCB suelen tener pocas imágenes "OK" vs muchas con defectos
-- Sin balanceo, el modelo puede sesgar hacia detectar defectos
-- La replicación 3x mejora la detección de PCBs correctos sin afectar precisión en defectos
-
-**Cómo ajustar:**
-- `BALANCE_OK_CLASS = False` → Sin replicación (usar dataset original)
-- `OK_REPLICATION_FACTOR = 2` → Duplicar imágenes OK
-- `OK_REPLICATION_FACTOR = 5` → Replicar 5 veces (para datasets muy desbalanceados)
+- Usa `BALANCE_OK_CLASS = True` para replicar ligeramente la clase "ok" según `OK_REPLICATION_FACTOR`.
+- Ajusta el factor en función del desbalance real; combínalo con los pesos automáticos de clase ya integrados en la pérdida y el sampler.
 
 ## 📝 Notas
 
-### Data Augmentation para PCB
-El sistema usa aumentaciones **específicamente diseñadas para PCBs**:
-- **Rotación limitada a ±5°**: Evita deformar componentes y trazas críticas
-- **Sin saturación**: Los PCBs tienen colores estandarizados (verde, cobre)
-- **Blur suave**: Simula variaciones de enfoque sin perder detalles
-- **Brightness/Contrast moderado**: Simula diferentes condiciones de iluminación
-
-❌ **No usar**: Crop agresivo, deformaciones, saturación alta, rotaciones >10°
-
-### Early Stopping
-El entrenamiento se detiene automáticamente cuando:
-- No hay mejora en validation accuracy por `EARLY_STOPPING_PATIENCE` (10) épocas consecutivas
-- La mejora es menor a `MIN_DELTA` (0.001)
-- Esto previene overfitting y ahorra tiempo de entrenamiento
-
-### Balanceo de Clases
-Se usan **dos estrategias complementarias**:
-1. **Replicación de datos** (opcional): Multiplica imágenes OK por `OK_REPLICATION_FACTOR`
-2. **Class weights automáticos**: Ajusta la loss function según frecuencia de cada clase
-
-### Recomendaciones
-- Se recomienda tener al menos **50-100 imágenes por clase** para buenos resultados
-- El modelo guardado (`pcb_resnet18_multiclass.pth`) es el de **mejor validation accuracy**
-- La división es **70% train, 15% validation, 15% test** con seed fijo para reproducibilidad
+- El entrenamiento se detiene si no hay mejora > `MIN_DELTA = 1e-4` durante `EARLY_STOPPING_PATIENCE = 10` épocas.
+- El learning rate se reduce ×0.5 tras 3 épocas sin mejora de accuracy en validación.
+- Se recomienda disponer de al menos 50–100 imágenes por clase.
+- La división estratificada asegura proporciones consistentes en train/val/test.
 
 ## 🆚 Comparación con Versión Binaria
 
-| Característica | Binaria (`main.py`) | Multiclase (`main_multiclass.py`) |
-|----------------|---------------------|-------------------------------------|
-| Clases         | 2 (ok/defective)    | 6 (ok + 5 tipos de defectos)       |
-| Precisión      | Alta para detectar defectos | Identifica tipo específico     |
-| Uso            | Screening inicial   | Diagnóstico detallado              |
-| Entrenamiento  | Más rápido          | Requiere más datos                 |
+| Característica | Binaria (`main_singlesclass.py`) | Multiclase (`main_multiclass.py`) |
+|----------------|----------------------------------|-----------------------------------|
+| Clases         | 2 (ok / defectuoso)              | 5 (ok + 4 defectos específicos)   |
+| Objetivo       | Detección general de defectos    | Identificación del tipo de defecto |
+| Complejidad    | Menor                             | Mayor, requiere más datos         |
+| Modelo         | ResNet-18                         | ResNet-18 / ResNet-50             |
 
 ---
-
-**Desarrollado para detección automática de defectos en PCB** 🔍⚡
+ 
+**Desarrollado para automatizar la detección de defectos en PCB** 🔍⚡

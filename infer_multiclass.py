@@ -13,7 +13,7 @@ import numpy as np
 
 # Configuración
 NUM_CLASSES = 5
-MODEL_PATH = "pcb_resnet18_multiclass.pth"
+MODEL_PATH = "pcb_resnet50_multiclass.pth"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CLASS_NAMES = [
@@ -26,14 +26,14 @@ CLASS_NAMES = [
 
 # Transform
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((512, 512)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
 def load_model(model_path):
     """Carga el modelo entrenado"""
-    model = models.resnet18(pretrained=False)
+    model = models.resnet50(pretrained=False)
     in_features = model.fc.in_features
     model.fc = nn.Linear(in_features, NUM_CLASSES)
     model.load_state_dict(torch.load(model_path, map_location=DEVICE))
